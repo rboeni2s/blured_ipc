@@ -91,7 +91,7 @@ impl Instance
         }
     }
 
-    pub fn send(&mut self, action: Action) -> Result<Status>
+    pub fn message(&mut self, action: Action) -> Result<Status>
     {
         self.write_blocking(action)?;
         self.read_blocking()
