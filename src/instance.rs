@@ -1,5 +1,6 @@
+use crate::FromToJson;
 use crate::msg::{Action, InstanceIdentifier, Message, Response, Status};
-use std::io::Result;
+use std::io::{BufRead, BufReader, BufWriter, Result, Write};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 
@@ -51,7 +52,8 @@ impl InstanceFilter
 pub struct Instance
 {
     filter: InstanceFilter,
-    socket: UnixStream,
+    reader: BufReader<UnixStream>,
+    writer: BufWriter<UnixStream>,
 }
 
 
@@ -59,9 +61,12 @@ impl Instance
 {
     pub fn connect_with(filter: InstanceFilter, addr: impl AsRef<Path>) -> Result<Self>
     {
+        let stream = UnixStream::connect(addr)?;
+
         Ok(Self {
             filter,
-            socket: UnixStream::connect(addr)?,
+            reader: BufReader::new(stream.try_clone()?),
+            writer: BufWriter::new(stream),
         })
     }
 
@@ -72,17 +77,21 @@ impl Instance
 
     pub fn write_blocking(&mut self, action: Action) -> Result<()>
     {
-        Ok(serde_json::to_writer(
-            &mut self.socket,
-            &self.filter.create_msg(action),
-        )?)
+        serde_json::to_writer(&mut self.writer, &self.filter.create_msg(action))?;
+        self.writer.write_all(b"\0")?;
+        self.writer.flush()?;
+        Ok(())
     }
 
     pub fn read_blocking(&mut self) -> Result<Status>
     {
+        let mut buf = Vec::with_capacity(256);
+
         loop
         {
-            let response = serde_json::from_reader::<_, Response>(&mut self.socket)?;
+            self.reader.read_until(b'\0', &mut buf)?;
+            let response = Response::from_json_bytes(&buf)?;
+            buf.clear();
 
             if let Some(status) = self.filter.filter_owned(response)
             {
