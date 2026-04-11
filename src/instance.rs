@@ -90,7 +90,7 @@ impl Instance
         loop
         {
             self.reader.read_until(b'\0', &mut buf)?;
-            let response = Response::from_json_bytes(&buf)?;
+            let response = Response::from_json_bytes(&buf[..buf.len().saturating_sub(1)])?;
             buf.clear();
 
             if let Some(status) = self.filter.filter_owned(response)
