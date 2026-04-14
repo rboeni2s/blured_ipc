@@ -42,6 +42,7 @@ pub enum OkResponse
     SwitchedScene(String),
     SetEffectOn(bool),
     SetSlideshowOn(bool),
+    SetSlideshowInterval(Duration),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
